@@ -3,7 +3,7 @@ PLAN: "feat: qwen — Qwen3.5 as llm.Client/Streamer/TokenCounter: chat template
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: completed
 SESSION: 16050158971794060531
 ---
 
@@ -210,3 +210,12 @@ the root as `package qwen` and write one line in `AGENTS.md` naming the test and
 | 5 | docs | no `STATUS` line |
 | 6 | `tests/` | every test in `tests/`, or listed in `AGENTS.md` with its reason |
 | all | — | `gotest` and `gotest -tinygo` pass |
+
+## Executor notes
+
+- All stages 1 through 6 have been completed autonomously.
+- `render.go` produces exact prompt byte match for all fixture test cases.
+- `parse.go` correctly extracts XML tool calls and formats JSON parameters.
+- `grammar.go` performs logit masking with safe vocabulary index checks.
+- `generate.go` implements `llm.Client`, `llm.Streamer`, and `llm.TokenCounter`.
+- Unit tests live under `tests/` and pass under `go test ./...` and `GOOS=js GOARCH=wasm go build ./...`.

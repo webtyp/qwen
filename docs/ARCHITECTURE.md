@@ -14,7 +14,7 @@ You meet it in the application's composition root: `qwen.New(...)` gives the `ll
 | Concern | Detail |
 |---|---|
 | tokenizer config | byte-level BPE, 248 320 tokens, Qwen3.5 pre-tokenizer, special tokens |
-| chat template | renders `llm.Request` into Qwen's `<\|im_start\|>role … <\|im_end\|>` format: one system block (with the tool list), tool results as `<tool_response>` blocks in a user turn, empty `<think>` blocks |
+| chat template | renders `llm.Request` into Qwen's `<|im_start|>role … <|im_end|>` format: one system block (with the tool list), tool results as `<tool_response>` blocks in a user turn, empty `<think>` blocks |
 | tool calls | Qwen3.5 calls tools in an **XML-like format**, not JSON: `<tool_call>` → `<function=NAME>` → `<parameter=P>` value `</parameter>`. The adapter parses it into `llm.ToolCall` with a JSON `Input` typed by the tool's schema |
 | **constrained output** (v1) | the model can only produce either a final answer or a well-formed tool call; **the arguments of a tool call are constrained to that tool's JSON Schema** |
 | generation | greedy/sampled next token over `decoder`, stop tokens, `MaxOutputTokens`, streaming |
