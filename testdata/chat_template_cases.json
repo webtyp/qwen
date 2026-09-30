@@ -1,0 +1,259 @@
+[
+ {
+  "name": "plain",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Eres la recepcionista de Clínica San Miguel."
+   },
+   {
+    "role": "user",
+    "content": "Hola"
+   }
+  ],
+  "tools": null,
+  "prompt": "<|im_start|>system\nEres la recepcionista de Clínica San Miguel.<|im_end|>\n<|im_start|>user\nHola<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "no_system",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hola"
+   }
+  ],
+  "tools": null,
+  "prompt": "<|im_start|>user\nHola<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "with_tools",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Eres la recepcionista de Clínica San Miguel."
+   },
+   {
+    "role": "user",
+    "content": "¿A qué hora abren los lunes?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "clinic_hours",
+     "description": "Opening hours of the clinic for one day",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "day": {
+        "type": "string",
+        "description": "day of the week"
+       }
+      },
+      "required": [
+       "day"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "book_appointment",
+     "description": "Book an appointment",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "day": {
+        "type": "string"
+       },
+       "hour": {
+        "type": "integer"
+       },
+       "urgent": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "day",
+       "hour"
+      ]
+     }
+    }
+   }
+  ],
+  "prompt": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"clinic_hours\", \"description\": \"Opening hours of the clinic for one day\", \"parameters\": {\"type\": \"object\", \"properties\": {\"day\": {\"type\": \"string\", \"description\": \"day of the week\"}}, \"required\": [\"day\"]}}}\n{\"type\": \"function\", \"function\": {\"name\": \"book_appointment\", \"description\": \"Book an appointment\", \"parameters\": {\"type\": \"object\", \"properties\": {\"day\": {\"type\": \"string\"}, \"hour\": {\"type\": \"integer\"}, \"urgent\": {\"type\": \"boolean\"}}, \"required\": [\"day\", \"hour\"]}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n\nEres la recepcionista de Clínica San Miguel.<|im_end|>\n<|im_start|>user\n¿A qué hora abren los lunes?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "tool_round_trip",
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "clinic_hours",
+     "description": "Opening hours of the clinic for one day",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "day": {
+        "type": "string",
+        "description": "day of the week"
+       }
+      },
+      "required": [
+       "day"
+      ]
+     }
+    }
+   }
+  ],
+  "messages": [
+   {
+    "role": "system",
+    "content": "Eres la recepcionista de Clínica San Miguel."
+   },
+   {
+    "role": "user",
+    "content": "¿A qué hora abren los lunes?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "clinic_hours",
+       "arguments": {
+        "day": "lunes"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": "8:00-20:00"
+   }
+  ],
+  "prompt": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"clinic_hours\", \"description\": \"Opening hours of the clinic for one day\", \"parameters\": {\"type\": \"object\", \"properties\": {\"day\": {\"type\": \"string\", \"description\": \"day of the week\"}}, \"required\": [\"day\"]}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n\nEres la recepcionista de Clínica San Miguel.<|im_end|>\n<|im_start|>user\n¿A qué hora abren los lunes?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<tool_call>\n<function=clinic_hours>\n<parameter=day>\nlunes\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\n8:00-20:00\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "two_tool_results",
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "clinic_hours",
+     "description": "Opening hours of the clinic for one day",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "day": {
+        "type": "string",
+        "description": "day of the week"
+       }
+      },
+      "required": [
+       "day"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "book_appointment",
+     "description": "Book an appointment",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "day": {
+        "type": "string"
+       },
+       "hour": {
+        "type": "integer"
+       },
+       "urgent": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "day",
+       "hour"
+      ]
+     }
+    }
+   }
+  ],
+  "messages": [
+   {
+    "role": "system",
+    "content": "Eres la recepcionista de Clínica San Miguel."
+   },
+   {
+    "role": "user",
+    "content": "Reserva el lunes a las 9 si abren"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "clinic_hours",
+       "arguments": {
+        "day": "lunes"
+       }
+      }
+     },
+     {
+      "type": "function",
+      "function": {
+       "name": "book_appointment",
+       "arguments": {
+        "day": "lunes",
+        "hour": 9,
+        "urgent": false
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": "8:00-20:00"
+   },
+   {
+    "role": "tool",
+    "content": "reservado"
+   }
+  ],
+  "prompt": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"clinic_hours\", \"description\": \"Opening hours of the clinic for one day\", \"parameters\": {\"type\": \"object\", \"properties\": {\"day\": {\"type\": \"string\", \"description\": \"day of the week\"}}, \"required\": [\"day\"]}}}\n{\"type\": \"function\", \"function\": {\"name\": \"book_appointment\", \"description\": \"Book an appointment\", \"parameters\": {\"type\": \"object\", \"properties\": {\"day\": {\"type\": \"string\"}, \"hour\": {\"type\": \"integer\"}, \"urgent\": {\"type\": \"boolean\"}}, \"required\": [\"day\", \"hour\"]}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n\nEres la recepcionista de Clínica San Miguel.<|im_end|>\n<|im_start|>user\nReserva el lunes a las 9 si abren<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n<tool_call>\n<function=clinic_hours>\n<parameter=day>\nlunes\n</parameter>\n</function>\n</tool_call>\n<tool_call>\n<function=book_appointment>\n<parameter=day>\nlunes\n</parameter>\n<parameter=hour>\n9\n</parameter>\n<parameter=urgent>\nFalse\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\n8:00-20:00\n</tool_response>\n<tool_response>\nreservado\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "multi_turn",
+  "tools": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "Eres la recepcionista de Clínica San Miguel."
+   },
+   {
+    "role": "user",
+    "content": "Hola"
+   },
+   {
+    "role": "assistant",
+    "content": "¡Hola! ¿En qué puedo ayudar?"
+   },
+   {
+    "role": "user",
+    "content": "Gracias"
+   }
+  ],
+  "prompt": "<|im_start|>system\nEres la recepcionista de Clínica San Miguel.<|im_end|>\n<|im_start|>user\nHola<|im_end|>\n<|im_start|>assistant\n¡Hola! ¿En qué puedo ayudar?<|im_end|>\n<|im_start|>user\nGracias<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ }
+]
