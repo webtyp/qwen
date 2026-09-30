@@ -3,8 +3,9 @@ PLAN: "feat: qwen — Qwen3.5 as llm.Client/Streamer/TokenCounter: chat template
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 16050158971794060531
+PR: https://github.com/webtyp/qwen/pull/1
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
@@ -210,3 +211,15 @@ the root as `package qwen` and write one line in `AGENTS.md` naming the test and
 | 5 | docs | no `STATUS` line |
 | 6 | `tests/` | every test in `tests/`, or listed in `AGENTS.md` with its reason |
 | all | — | `gotest` and `gotest -tinygo` pass |
+
+## Executor notes
+
+Round 2 (review, applied by the planning agent on this branch): `Config.Vocab` removed (the
+vocabulary comes from `Weights.Tokenizer.Vocab`, as in `bekko`); `New` requires weights and
+returns every error; tests build through `newModel` with a scripted stepper. `Qwen35_08B`
+corrected to the checkpoint's config.json (8/2 heads of 256, theta 1e7, every fourth layer full
+attention). The grammar reads decoded token bytes (`Ċ` is a newline), and skips the vocabulary
+scan in free text. The template's own `<think>`, `<tool_call>` and `<tool_response>` tags are
+emitted as their added-token ids (248058–248069): the six fixture prompts now encode to exactly
+the ids of the Hugging Face tokenizer (checked once against the real vocabulary). `schema.go`
+split out of `grammar.go`.
