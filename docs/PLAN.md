@@ -3,8 +3,9 @@ PLAN: "feat: qwen — Qwen3.5 as llm.Client/Streamer/TokenCounter: chat template
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: completed
+STATUS: review
 SESSION: 16050158971794060531
+PR: https://github.com/webtyp/qwen/pull/1
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
