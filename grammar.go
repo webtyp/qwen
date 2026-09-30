@@ -7,18 +7,6 @@ import (
 	"webtyp.com/llm"
 )
 
-type paramSchema struct {
-	name     string
-	pType    string   // "string", "integer", "number", "boolean", "enum", "object", "array"
-	enums    []string // if enum
-	required bool
-}
-
-type toolSchema struct {
-	name   string
-	params []paramSchema
-}
-
 type grammar struct {
 	tools []toolSchema
 	vocab [][]byte
@@ -33,122 +21,6 @@ func newGrammar(tools []llm.ToolDef, vocab [][]byte) *grammar {
 		tools: schemas,
 		vocab: vocab,
 	}
-}
-
-func parseToolSchema(td llm.ToolDef) toolSchema {
-	ts := toolSchema{name: td.Name}
-	schemaJSON := td.InputSchema
-	if schemaJSON == "" {
-		return ts
-	}
-
-	reqList := parseRequiredList(schemaJSON)
-	propTypes := parseSchemaPropertyTypes(schemaJSON)
-
-	for _, pt := range propTypes {
-		ps := paramSchema{
-			name:  pt.name,
-			pType: pt.pType,
-		}
-		for _, reqName := range reqList {
-			if reqName == pt.name {
-				ps.required = true
-				break
-			}
-		}
-		ps.enums = parseEnumListForProperty(schemaJSON, pt.name)
-		if len(ps.enums) > 0 {
-			ps.pType = "enum"
-		}
-		ts.params = append(ts.params, ps)
-	}
-
-	return ts
-}
-
-func parseRequiredList(schemaJSON string) []string {
-	var res []string
-	reqIdx := fmt.Index(schemaJSON, `"required"`)
-	if reqIdx == -1 {
-		return res
-	}
-	sub := schemaJSON[reqIdx:]
-	startBracket := fmt.Index(sub, "[")
-	if startBracket == -1 {
-		return res
-	}
-	sub = sub[startBracket+1:]
-	endBracket := fmt.Index(sub, "]")
-	if endBracket != -1 {
-		sub = sub[:endBracket]
-	}
-
-	src := []byte(sub)
-	i := 0
-	for i < len(src) {
-		i = skipWhitespace(src, i)
-		if i >= len(src) {
-			break
-		}
-		if src[i] == ',' {
-			i++
-			continue
-		}
-		if src[i] == '"' {
-			val, nextI := parseJSONStringValue(src, i)
-			if val != "" {
-				res = append(res, val)
-			}
-			i = nextI
-		} else {
-			i++
-		}
-	}
-	return res
-}
-
-func parseEnumListForProperty(schemaJSON string, propName string) []string {
-	var res []string
-	pIdx := fmt.Index(schemaJSON, `"`+propName+`"`)
-	if pIdx == -1 {
-		return res
-	}
-	sub := schemaJSON[pIdx:]
-	enumIdx := fmt.Index(sub, `"enum"`)
-	if enumIdx == -1 {
-		return res
-	}
-	sub = sub[enumIdx:]
-	startBracket := fmt.Index(sub, "[")
-	if startBracket == -1 {
-		return res
-	}
-	sub = sub[startBracket+1:]
-	endBracket := fmt.Index(sub, "]")
-	if endBracket != -1 {
-		sub = sub[:endBracket]
-	}
-
-	src := []byte(sub)
-	i := 0
-	for i < len(src) {
-		i = skipWhitespace(src, i)
-		if i >= len(src) {
-			break
-		}
-		if src[i] == ',' {
-			i++
-			continue
-		}
-		if src[i] == '"' {
-			val, nextI := parseJSONStringValue(src, i)
-			res = append(res, val)
-			i = nextI
-		} else {
-			i++
-		}
-	}
-	return res
 }
 
 type grammarState struct {
@@ -176,42 +48,29 @@ func (g *grammar) maskLogits(logits []float32, state grammarState) {
 	if len(g.tools) == 0 {
 		return
 	}
-
+	minusInf := float32(math.Inf(-1))
 	imStartID := lookupSpecialTokenID(tokenImStart)
 	endOfTextID := lookupSpecialTokenID(tokenEndOfText)
 	imEndID := lookupSpecialTokenID(tokenImEnd)
-
-	if imStartID >= 0 && imStartID < len(logits) {
-		logits[imStartID] = float32(math.Inf(-1))
-	}
-	if endOfTextID >= 0 && endOfTextID < len(logits) {
-		logits[endOfTextID] = float32(math.Inf(-1))
-	}
-
-	if state.mode != gModeFreeText {
-		if imEndID >= 0 && imEndID < len(logits) {
-			logits[imEndID] = float32(math.Inf(-1))
+	for _, id := range [...]int{imStartID, endOfTextID} {
+		if id < len(logits) {
+			logits[id] = minusInf
 		}
 	}
-
+	// In free text any token may follow, and <tool_call> opens the structured part: scanning
+	// the 248 320-token vocabulary is only needed inside a tool call.
+	if state.mode == gModeFreeText {
+		return
+	}
+	if imEndID < len(logits) {
+		logits[imEndID] = minusInf
+	}
 	for i := range logits {
-		if i >= len(g.vocab) {
+		if i >= len(g.vocab) || i == imStartID || i == endOfTextID || i == imEndID {
 			continue
 		}
-		tokBytes := g.vocab[i]
-		tokStr := string(tokBytes)
-		if tokStr == tokenImStart || tokStr == tokenEndOfText {
-			logits[i] = float32(math.Inf(-1))
-			continue
-		}
-		if state.mode != gModeFreeText && tokStr == tokenImEnd {
-			logits[i] = float32(math.Inf(-1))
-			continue
-		}
-
-		_, ok := g.stepBytes(state, tokBytes)
-		if !ok {
-			logits[i] = float32(math.Inf(-1))
+		if _, ok := g.stepBytes(state, g.vocab[i]); !ok {
+			logits[i] = minusInf
 		}
 	}
 }
@@ -490,120 +349,6 @@ func (g *grammar) stepByte(st grammarState, b byte) (grammarState, bool) {
 	}
 
 	return st, false
-}
-
-func validateParamPrefix(val string, param paramSchema) bool {
-	switch param.pType {
-	case "enum":
-		if val == "" {
-			return true
-		}
-		for _, e := range param.enums {
-			if fmt.HasPrefix(e, val) {
-				return true
-			}
-		}
-		return false
-	case "integer":
-		if val == "" {
-			return true
-		}
-		for i := 0; i < len(val); i++ {
-			if i == 0 && val[i] == '-' {
-				continue
-			}
-			if val[i] < '0' || val[i] > '9' {
-				return false
-			}
-		}
-		return true
-	case "number":
-		if val == "" {
-			return true
-		}
-		hasDot := false
-		for i := 0; i < len(val); i++ {
-			if i == 0 && val[i] == '-' {
-				continue
-			}
-			if val[i] == '.' {
-				if hasDot {
-					return false
-				}
-				hasDot = true
-				continue
-			}
-			if val[i] < '0' || val[i] > '9' {
-				return false
-			}
-		}
-		return true
-	case "boolean":
-		if val == "" {
-			return true
-		}
-		return fmt.HasPrefix("true", val) || fmt.HasPrefix("false", val) || fmt.HasPrefix("True", val) || fmt.HasPrefix("False", val)
-	default: // string, object, array
-		// Cannot contain tags
-		if fmt.Contains(val, "<tool_call>") ||
-			fmt.Contains(val, "</tool_call>") ||
-			fmt.Contains(val, "<function=") ||
-			fmt.Contains(val, "</function>") ||
-			fmt.Contains(val, "<parameter=") {
-			return false
-		}
-		return true
-	}
-}
-
-func validateParamValue(val string, param paramSchema) bool {
-	switch param.pType {
-	case "integer":
-		if len(val) == 0 {
-			return false
-		}
-		for i := 0; i < len(val); i++ {
-			if i == 0 && val[i] == '-' {
-				continue
-			}
-			if val[i] < '0' || val[i] > '9' {
-				return false
-			}
-		}
-		return true
-	case "number":
-		if len(val) == 0 {
-			return false
-		}
-		hasDot := false
-		for i := 0; i < len(val); i++ {
-			if i == 0 && val[i] == '-' {
-				continue
-			}
-			if val[i] == '.' {
-				if hasDot {
-					return false
-				}
-				hasDot = true
-				continue
-			}
-			if val[i] < '0' || val[i] > '9' {
-				return false
-			}
-		}
-		return true
-	case "boolean":
-		return val == "true" || val == "false" || val == "True" || val == "False"
-	case "enum":
-		for _, e := range param.enums {
-			if e == val {
-				return true
-			}
-		}
-		return false
-	default: // string, object, array
-		return true
-	}
 }
 
 func (g *grammar) nextState(state grammarState, tokenStr string) grammarState {

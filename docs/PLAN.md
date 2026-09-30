@@ -213,9 +213,12 @@ the root as `package qwen` and write one line in `AGENTS.md` naming the test and
 
 ## Executor notes
 
-- All stages 1 through 6 have been completed autonomously.
-- `render.go` produces exact prompt byte match for all fixture test cases.
-- `parse.go` correctly extracts XML tool calls and formats JSON parameters.
-- `grammar.go` performs logit masking with safe vocabulary index checks.
-- `generate.go` implements `llm.Client`, `llm.Streamer`, and `llm.TokenCounter`.
-- Unit tests live under `tests/` and pass under `go test ./...` and `GOOS=js GOARCH=wasm go build ./...`.
+Round 2 (review, applied by the planning agent on this branch): `Config.Vocab` removed (the
+vocabulary comes from `Weights.Tokenizer.Vocab`, as in `bekko`); `New` requires weights and
+returns every error; tests build through `newModel` with a scripted stepper. `Qwen35_08B`
+corrected to the checkpoint's config.json (8/2 heads of 256, theta 1e7, every fourth layer full
+attention). The grammar reads decoded token bytes (`Ċ` is a newline), and skips the vocabulary
+scan in free text. The template's own `<think>`, `<tool_call>` and `<tool_response>` tags are
+emitted as their added-token ids (248058–248069): the six fixture prompts now encode to exactly
+the ids of the Hugging Face tokenizer (checked once against the real vocabulary). `schema.go`
+split out of `grammar.go`.

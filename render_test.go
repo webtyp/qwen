@@ -9,10 +9,10 @@ import (
 )
 
 type TestCase struct {
-	Name     string          `json:"name"`
-	Messages []RawMessage    `json:"messages"`
-	Tools    []RawToolDef    `json:"tools"`
-	Prompt   string          `json:"prompt"`
+	Name     string       `json:"name"`
+	Messages []RawMessage `json:"messages"`
+	Tools    []RawToolDef `json:"tools"`
+	Prompt   string       `json:"prompt"`
 }
 
 type RawMessage struct {
@@ -32,7 +32,7 @@ type RawCallFunction struct {
 }
 
 type RawToolDef struct {
-	Type     string          `json:"type"`
+	Type     string         `json:"type"`
 	Function RawFunctionDef `json:"function"`
 }
 

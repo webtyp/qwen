@@ -4,8 +4,8 @@ import (
 	"math"
 
 	"webtyp.com/context"
+	"webtyp.com/fmt"
 	"webtyp.com/llm"
-	"webtyp.com/tokenizer"
 )
 
 // Ensure Model implements llm.Client, llm.Streamer, llm.TokenCounter
@@ -17,11 +17,7 @@ var (
 
 // CountTokens returns the token count for a text string using EncodeOrdinary.
 func (m *Model) CountTokens(text string) int {
-	if m.bpe != nil {
-		return len(m.bpe.EncodeOrdinary(nil, text))
-	}
-	var bpe tokenizer.BPE
-	return len(bpe.EncodeOrdinary(nil, text))
+	return len(m.bpe.EncodeOrdinary(nil, text))
 }
 
 // Generate generates a complete response for a prompt request.
@@ -115,34 +111,20 @@ func (m *Model) generateStreamInternal(
 	for _, seg := range segs {
 		if seg.IsSpecial {
 			id := lookupSpecialTokenID(seg.Text)
-			if id >= 0 {
-				promptIds = append(promptIds, int32(id))
+			if id < 0 {
+				return fmt.Errf("qwen: render emitted %q, which has no token id", seg.Text)
 			}
+			promptIds = append(promptIds, int32(id))
 		} else {
-			if m.bpe != nil {
-				promptIds = m.bpe.EncodeOrdinary(promptIds, seg.Text)
-			} else {
-				for i := 0; i < len(seg.Text); i++ {
-					promptIds = append(promptIds, int32(seg.Text[i]))
-				}
-			}
+			promptIds = m.bpe.EncodeOrdinary(promptIds, seg.Text)
 		}
 	}
 
 	*promptTokenCount = len(promptIds)
 
-	if m.stepper == nil {
-		*stopReason = llm.StopEndTurn
-		return nil
-	}
-
 	st := m.stepper.NewState()
 
-	vocabSize := cfgVocabSize(m.cfg)
-	if vocabSize < len(m.tok.vocab) {
-		vocabSize = len(m.tok.vocab)
-	}
-	logits := make([]float32, vocabSize)
+	logits := make([]float32, m.logitsSize())
 
 	// Feed prompt
 	for _, id := range promptIds {
@@ -201,16 +183,30 @@ func lookupSpecialTokenID(name string) int {
 		return 248045
 	case tokenImEnd:
 		return 248046
+	case tagToolCall:
+		return 248058
+	case tagToolCallEnd:
+		return 248059
+	case tagToolResponse:
+		return 248066
+	case tagToolResponseEnd:
+		return 248067
+	case tagThink:
+		return 248068
+	case tagThinkEnd:
+		return 248069
 	default:
 		return -1
 	}
 }
 
-func cfgVocabSize(cfg Config) int {
-	if cfg.Decoder.Vocab > 0 {
-		return cfg.Decoder.Vocab
+// logitsSize is the width of the decoder's output: its embedding rows, which can exceed the
+// tokenizer's vocabulary (Qwen3.5 pads the table to 248 320).
+func (m *Model) logitsSize() int {
+	if m.cfg.Decoder.Vocab > len(m.tok.vocab) {
+		return m.cfg.Decoder.Vocab
 	}
-	return 248320
+	return len(m.tok.vocab)
 }
 
 func argMax(logits []float32) int {
@@ -229,13 +225,10 @@ func argMax(logits []float32) int {
 }
 
 func (m *Model) decodeToken(id int) string {
-	if m.bpe != nil {
-		return m.bpe.Decode([]int32{int32(id)})
-	}
-	if id >= 0 && id < len(m.tok.vocab) && len(m.tok.vocab[id]) > 0 {
+	if id >= 0 && id < len(m.tok.vocab) {
 		return string(m.tok.vocab[id])
 	}
-	return string(rune(id))
+	return ""
 }
 
 func gInToolCallMarkup(st grammarState) bool {

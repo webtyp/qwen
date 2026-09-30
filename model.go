@@ -2,35 +2,49 @@ package qwen
 
 import (
 	"webtyp.com/decoder"
+	"webtyp.com/fmt"
 	"webtyp.com/tokenizer"
 	"webtyp.com/weights"
 )
 
 // Config configures a Qwen model instance.
 type Config struct {
-	Weights *weights.Artifact // from webtyp/weightsc -quant int8-block32 -prefix model.language_model.
-	Vocab   []byte            // vocabulary file bytes (newline separated tokens)
-	Merges  []byte            // the companion .merges file bytes (newline separated)
+	Weights *weights.Artifact // from webtyp/weightsc -quant int8-block32 -prefix model.language_model.; its Tokenizer.Vocab is the vocabulary
+	Merges  []byte            // the companion .merges file (one "left right" pair per line, rank order)
 	Decoder decoder.Config    // the checkpoint's shape; Qwen35_08B for the 0.8B model
 }
 
-// Qwen35_08B defines the shape/config for Qwen3.5-0.8B.
+// Qwen35_08B is the shape of Qwen3.5-0.8B, from the text_config of its config.json:
+// 24 layers where every fourth is full attention (18 Gated DeltaNet + 6 gated attention),
+// grouped-query attention 8/2 with 256-wide heads, RoPE on the first 64 dims
+// (partial_rotary_factor 0.25) with theta 1e7.
 var Qwen35_08B = decoder.Config{
 	Vocab:            248320,
 	Hidden:           1024,
 	Intermediate:     3584,
-	Heads:            16,
-	KVHeads:          8,
-	HeadDim:          128,
+	Layers:           qwen35Layers(24, 4),
+	Heads:            8,
+	KVHeads:          2,
+	HeadDim:          256,
 	RotaryDim:        64,
-	RopeTheta:        1000000.0,
+	RopeTheta:        10000000,
 	LinearKeyHeads:   16,
 	LinearValueHeads: 16,
 	LinearKeyDim:     128,
 	LinearValueDim:   128,
 	ConvKernel:       4,
 	Eps:              1e-6,
-	Layers:           make([]decoder.LayerKind, 24),
+}
+
+// qwen35Layers is config.json's layer_types: layer i is full attention when (i+1) % interval == 0.
+func qwen35Layers(n, interval int) []decoder.LayerKind {
+	layers := make([]decoder.LayerKind, n)
+	for i := range layers {
+		if (i+1)%interval == 0 {
+			layers[i] = decoder.FullAttention
+		}
+	}
+	return layers
 }
 
 // stepper abstracts model state stepping for generation loops and testing with fakes.
@@ -65,63 +79,49 @@ type qwenTokenizer struct {
 	vocab [][]byte
 }
 
-// New creates a new Qwen model.
+const (
+	errWeightsRequired = "qwen: Config.Weights is required"
+	errVocabRequired   = "qwen: Config.Weights has no tokenizer vocabulary"
+	errMergesRequired  = "qwen: Config.Merges is required"
+	weightsPrefix      = "model.language_model."
+)
+
+// New creates a Qwen model from its weights artifact and merges.
 func New(cfg Config) (*Model, error) {
-	var decModel *decoder.Model
-	if cfg.Weights != nil {
-		m, err := decoder.New(cfg.Decoder, cfg.Weights, "model.language_model.")
-		if err != nil {
-			return nil, err
-		}
-		decModel = m
+	if cfg.Weights == nil {
+		return nil, fmt.Err(errWeightsRequired)
 	}
+	if len(cfg.Weights.Tokenizer.Vocab) == 0 {
+		return nil, fmt.Err(errVocabRequired)
+	}
+	dec, err := decoder.New(cfg.Decoder, cfg.Weights, weightsPrefix)
+	if err != nil {
+		return nil, err
+	}
+	return newModel(cfg, cfg.Weights.Tokenizer.Vocab, &realStepper{model: dec})
+}
 
-	if len(cfg.Vocab) == 0 {
-		return nil, fmtErrf("qwen: vocab is required")
-	}
+// newModel builds the tokenizer and the grammar's view of the vocabulary around a stepper.
+// New passes the real decoder; tests pass a scripted one.
+func newModel(cfg Config, vocab []string, s stepper) (*Model, error) {
 	if len(cfg.Merges) == 0 {
-		return nil, fmtErrf("qwen: merges is required")
+		return nil, fmt.Err(errMergesRequired)
 	}
-
-	vocabLines := splitLines(string(cfg.Vocab))
-	mergeLines := splitLines(string(cfg.Merges))
-
 	bpe, err := tokenizer.New(tokenizer.Config{
 		Scheme: tokenizer.QwenScheme{},
-		Vocab:  vocabLines,
-		Merges: mergeLines,
+		Vocab:  vocab,
+		Merges: splitLines(string(cfg.Merges)),
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	vocabBytes := make([][]byte, len(vocabLines))
-	for i, v := range vocabLines {
-		vocabBytes[i] = []byte(v)
+	// The grammar matches the bytes a token writes, not its vocabulary spelling: byte-level
+	// BPE stores "\n" as "Ċ" and " " as "Ġ".
+	decoded := make([][]byte, len(vocab))
+	for i, v := range vocab {
+		decoded[i] = tokenizer.QwenScheme{}.DecodeToken(nil, v)
 	}
-
-	m := &Model{
-		cfg:     cfg,
-		tok:     &qwenTokenizer{vocab: vocabBytes},
-		bpe:     bpe,
-	}
-	if decModel != nil {
-		m.stepper = &realStepper{model: decModel}
-	}
-
-	return m, nil
-}
-
-type customErr struct {
-	msg string
-}
-
-func (e *customErr) Error() string {
-	return e.msg
-}
-
-func fmtErrf(msg string) error {
-	return &customErr{msg: msg}
+	return &Model{cfg: cfg, stepper: s, tok: &qwenTokenizer{vocab: decoded}, bpe: bpe}, nil
 }
 
 func splitLines(s string) []string {

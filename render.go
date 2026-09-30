@@ -1,6 +1,7 @@
 package qwen
 
 import (
+	"webtyp.com/fmt"
 	"webtyp.com/llm"
 )
 
@@ -20,6 +21,21 @@ func render(req llm.Request) ([]segment, error) {
 	addText := func(text string) {
 		if text != "" {
 			segs = append(segs, segment{IsSpecial: false, Text: text})
+		}
+	}
+	// addTemplate emits text the chat template writes. Qwen's tokenizer turns the tags of
+	// addedTags into single token ids wherever they appear, so the template's own tags are
+	// emitted as special segments; content written by people or tools goes through addText.
+	addTemplate := func(text string) {
+		for text != "" {
+			at, tag := firstAddedTag(text)
+			if at < 0 {
+				addText(text)
+				return
+			}
+			addText(text[:at])
+			addSpecial(tag)
+			text = text[at+len(tag):]
 		}
 	}
 
@@ -44,7 +60,7 @@ func render(req llm.Request) ([]segment, error) {
 		addText("system\n")
 
 		if hasTools {
-			addText(toolsHeader)
+			addTemplate(toolsHeader)
 			for i, tool := range req.Tools {
 				if i > 0 {
 					addText("\n")
@@ -52,7 +68,7 @@ func render(req llm.Request) ([]segment, error) {
 				toolJSON := buildToolJSON(tool.Name, tool.Description, []byte(tool.InputSchema))
 				addText(string(toolJSON))
 			}
-			addText(toolsFooter)
+			addTemplate(toolsFooter)
 		}
 
 		for i, sys := range sysParts {
@@ -106,7 +122,7 @@ func render(req llm.Request) ([]segment, error) {
 			addText("assistant\n")
 
 			if i > lastUserIdx {
-				addText(thinkBlock)
+				addTemplate(thinkBlock)
 			}
 
 			if msg.Content != "" {
@@ -118,7 +134,7 @@ func render(req llm.Request) ([]segment, error) {
 					if j > 0 {
 						addText("\n")
 					}
-					addText(tagToolCall)
+					addTemplate(tagToolCall)
 					addText("\n")
 					addText(tagFunctionStart)
 					addText(call.Name)
@@ -127,7 +143,7 @@ func render(req llm.Request) ([]segment, error) {
 					addText(formattedArgs)
 					addText(tagFunctionEnd)
 					addText("\n")
-					addText(tagToolCallEnd)
+					addTemplate(tagToolCallEnd)
 				}
 			}
 
@@ -142,11 +158,11 @@ func render(req llm.Request) ([]segment, error) {
 			} else {
 				addText("\n")
 			}
-			addText(tagToolResponse)
+			addTemplate(tagToolResponse)
 			addText("\n")
 			addText(msg.Content)
 			addText("\n")
-			addText(tagToolResponseEnd)
+			addTemplate(tagToolResponseEnd)
 		}
 	}
 
@@ -159,7 +175,7 @@ func render(req llm.Request) ([]segment, error) {
 	// Generation prompt
 	addSpecial(tokenImStart)
 	addText("assistant\n")
-	addText(thinkBlock)
+	addTemplate(thinkBlock)
 
 	return segs, nil
 }
@@ -341,4 +357,19 @@ func isAlpha(b byte) bool {
 
 func isDigit(b byte) bool {
 	return b >= '0' && b <= '9'
+}
+
+// addedTags are the tokens Qwen3.5's tokenizer.json lists as added (non-special) tokens that
+// its chat template writes. Each is one id (addedTagIDs), never BPE pieces.
+var addedTags = [...]string{tagToolCall, tagToolCallEnd, tagToolResponse, tagToolResponseEnd, tagThink, tagThinkEnd}
+
+// firstAddedTag returns the position of the earliest added tag in text, or -1.
+func firstAddedTag(text string) (int, string) {
+	best, tag := -1, ""
+	for _, t := range addedTags {
+		if i := fmt.Index(text, t); i >= 0 && (best < 0 || i < best) {
+			best, tag = i, t
+		}
+	}
+	return best, tag
 }
