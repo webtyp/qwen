@@ -1,7 +1,7 @@
 webtyp.com/context v0.0.23 h1:T+lH+UteRAPD6gLH8oxW0TBr5aZlJwgfIpmnA4DdFSY=
 webtyp.com/context v0.0.23/go.mod h1:SXtpX0NmsG9zoL9B2uYVPy0ZfmXl0C1zyjQkYmuz38Q=
-webtyp.com/decoder v0.1.0 h1:GE18HlGg5jUQjGj5E1dDhkxHqSjYbftXXYPWymbW2oU=
-webtyp.com/decoder v0.1.0/go.mod h1:GFTBLmmlGiNeUhdDjKxWvvPGTpA+cyj0djPEBM3FnkI=
+webtyp.com/decoder v0.2.0 h1:+sEvndJgOXN3jpFviSxwZLkKfSXZpPjPXoFUFoMb6do=
+webtyp.com/decoder v0.2.0/go.mod h1:P5/A/mZGYCq1lIgO/jPQXDjw5u6jkvHlerOrS6v6B+M=
 webtyp.com/fetch v0.1.28 h1:Tb8NUBp/5tLWI22U0lg/YPrR1hJtR05a8VUC5UrXyns=
 webtyp.com/fetch v0.1.28/go.mod h1:ZX35mkKiyfjnJE9Ix9N+IT1ebFRTLm2fKbU0+eZ2XlA=
 webtyp.com/fmt v1.0.0 h1:W0vMMGC6ezg1q2LarAEaVnNvZ26hVqzZdQQH1wcNogM=
