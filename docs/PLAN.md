@@ -3,6 +3,8 @@ PLAN: "feat: reuse the state of the prompt's fixed prefix — each turn reads on
 TAG: v0.2.0
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 12849310964587612452
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
