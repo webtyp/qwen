@@ -1,11 +1,10 @@
-package tests
+package qwen
 
 import (
 	"testing"
 
 	"webtyp.com/context"
 	"webtyp.com/llm"
-	"webtyp.com/qwen"
 )
 
 type scriptedStepper struct {
@@ -37,39 +36,30 @@ func (s *scriptedStepper) Step(state any, token int, logits []float32) error {
 }
 
 func TestGenerateWithFakeStepper(t *testing.T) {
-	cfg := qwen.Config{
-		Decoder: qwen.Qwen35_08B,
+	cfg := Config{
+		Vocab:  []byte("H\no\nl\na\n<|im_end|>"),
+		Merges: []byte("H o\nHo l\nHol a"),
 	}
-	m, err := qwen.New(cfg)
+
+	m, err := New(cfg)
 	if err != nil {
 		t.Fatalf("failed to create model: %v", err)
 	}
 
-	vocab := map[int]string{
-		65:     "H",
-		66:     "o",
-		67:     "l",
-		68:     "a",
-		248046: "<|im_end|>",
-	}
-	qwen.SetVocabForTest(m, vocab)
-
 	t.Run("normal response generation", func(t *testing.T) {
-		// First few steps are prompt tokens. We provide enough scripted logits.
 		script := make([]int, 200)
 		for i := 0; i < 100; i++ {
-			script[i] = 65 // emit 'H' or initial token
+			script[i] = 0
 		}
-		script[100] = 65 // H
-		script[101] = 66 // o
-		script[102] = 67 // l
-		script[103] = 68 // a
+		script[100] = 0 // H
+		script[101] = 1 // o
+		script[102] = 2 // l
+		script[103] = 3 // a
 		script[104] = 248046
 
-		stepper := &scriptedStepper{
+		m.stepper = &scriptedStepper{
 			tokensToEmit: script,
 		}
-		qwen.SetStepperForTest(m, stepper)
 
 		req := llm.Request{
 			Messages: []llm.Message{
@@ -94,18 +84,17 @@ func TestGenerateWithFakeStepper(t *testing.T) {
 	t.Run("streaming response text pieces", func(t *testing.T) {
 		script := make([]int, 200)
 		for i := 0; i < 100; i++ {
-			script[i] = 65
+			script[i] = 0
 		}
-		script[100] = 65 // H
-		script[101] = 66 // o
-		script[102] = 67 // l
-		script[103] = 68 // a
+		script[100] = 0 // H
+		script[101] = 1 // o
+		script[102] = 2 // l
+		script[103] = 3 // a
 		script[104] = 248046
 
-		stepper := &scriptedStepper{
+		m.stepper = &scriptedStepper{
 			tokensToEmit: script,
 		}
-		qwen.SetStepperForTest(m, stepper)
 
 		req := llm.Request{
 			Messages: []llm.Message{

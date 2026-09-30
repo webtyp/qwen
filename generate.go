@@ -239,5 +239,5 @@ func (m *Model) decodeToken(id int) string {
 }
 
 func gInToolCallMarkup(st grammarState) bool {
-	return st.mode != modeFreeText
+	return st.mode != gModeFreeText
 }

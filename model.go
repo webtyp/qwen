@@ -9,19 +9,28 @@ import (
 // Config configures a Qwen model instance.
 type Config struct {
 	Weights *weights.Artifact // from webtyp/weightsc -quant int8-block32 -prefix model.language_model.
-	Merges  []byte            // the companion .merges file
+	Vocab   []byte            // vocabulary file bytes (newline separated tokens)
+	Merges  []byte            // the companion .merges file bytes (newline separated)
 	Decoder decoder.Config    // the checkpoint's shape; Qwen35_08B for the 0.8B model
 }
 
 // Qwen35_08B defines the shape/config for Qwen3.5-0.8B.
 var Qwen35_08B = decoder.Config{
-	Vocab:        248320,
-	Hidden:       1024,
-	Intermediate: 3584,
-	Heads:        16,
-	KVHeads:      8,
-	HeadDim:      128,
-	Eps:          1e-6,
+	Vocab:            248320,
+	Hidden:           1024,
+	Intermediate:     3584,
+	Heads:            16,
+	KVHeads:          8,
+	HeadDim:          128,
+	RotaryDim:        64,
+	RopeTheta:        1000000.0,
+	LinearKeyHeads:   16,
+	LinearValueHeads: 16,
+	LinearKeyDim:     128,
+	LinearValueDim:   128,
+	ConvKernel:       4,
+	Eps:              1e-6,
+	Layers:           make([]decoder.LayerKind, 24),
 }
 
 // stepper abstracts model state stepping for generation loops and testing with fakes.
@@ -67,25 +76,73 @@ func New(cfg Config) (*Model, error) {
 		decModel = m
 	}
 
-	var bpe *tokenizer.BPE
-	if len(cfg.Merges) > 0 {
-		b, err := tokenizer.New(tokenizer.Config{
-			Scheme: tokenizer.QwenScheme{},
-			Merges: cfg.Merges,
-		})
-		if err == nil {
-			bpe = b
-		}
+	if len(cfg.Vocab) == 0 {
+		return nil, fmtErrf("qwen: vocab is required")
+	}
+	if len(cfg.Merges) == 0 {
+		return nil, fmtErrf("qwen: merges is required")
+	}
+
+	vocabLines := splitLines(string(cfg.Vocab))
+	mergeLines := splitLines(string(cfg.Merges))
+
+	bpe, err := tokenizer.New(tokenizer.Config{
+		Scheme: tokenizer.QwenScheme{},
+		Vocab:  vocabLines,
+		Merges: mergeLines,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	vocabBytes := make([][]byte, len(vocabLines))
+	for i, v := range vocabLines {
+		vocabBytes[i] = []byte(v)
 	}
 
 	m := &Model{
-		cfg: cfg,
-		tok: &qwenTokenizer{},
-		bpe: bpe,
+		cfg:     cfg,
+		tok:     &qwenTokenizer{vocab: vocabBytes},
+		bpe:     bpe,
 	}
 	if decModel != nil {
 		m.stepper = &realStepper{model: decModel}
 	}
 
 	return m, nil
+}
+
+type customErr struct {
+	msg string
+}
+
+func (e *customErr) Error() string {
+	return e.msg
+}
+
+func fmtErrf(msg string) error {
+	return &customErr{msg: msg}
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			line := s[start:i]
+			if len(line) > 0 && line[len(line)-1] == '\r' {
+				line = line[:len(line)-1]
+			}
+			lines = append(lines, line)
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		line := s[start:]
+		if len(line) > 0 && line[len(line)-1] == '\r' {
+			line = line[:len(line)-1]
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }

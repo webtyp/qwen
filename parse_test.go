@@ -1,10 +1,9 @@
-package tests
+package qwen
 
 import (
 	"testing"
 
 	"webtyp.com/llm"
-	"webtyp.com/qwen"
 )
 
 func TestParseToolCalls(t *testing.T) {
@@ -23,7 +22,7 @@ func TestParseToolCalls(t *testing.T) {
 
 	t.Run("no tool calls", func(t *testing.T) {
 		text := "Hola, ¿en qué puedo ayudarte?"
-		content, calls, err := qwen.ParseToolCallsForTest(text, tools)
+		content, calls, err := parseToolCalls(text, tools)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -37,7 +36,7 @@ func TestParseToolCalls(t *testing.T) {
 
 	t.Run("single tool call", func(t *testing.T) {
 		text := "Déjame consultar el horario.\n<tool_call>\n<function=clinic_hours>\n<parameter=day>\nlunes\n</parameter>\n</function>\n</tool_call>"
-		content, calls, err := qwen.ParseToolCallsForTest(text, tools)
+		content, calls, err := parseToolCalls(text, tools)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -61,7 +60,7 @@ func TestParseToolCalls(t *testing.T) {
 
 	t.Run("multiple tool calls and types", func(t *testing.T) {
 		text := "<tool_call>\n<function=clinic_hours>\n<parameter=day>\nlunes\n</parameter>\n</function>\n</tool_call>\n<tool_call>\n<function=book_appointment>\n<parameter=day>\nlunes\n</parameter>\n<parameter=hour>\n9\n</parameter>\n<parameter=urgent>\nFalse\n</parameter>\n</function>\n</tool_call>"
-		content, calls, err := qwen.ParseToolCallsForTest(text, tools)
+		content, calls, err := parseToolCalls(text, tools)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -81,7 +80,7 @@ func TestParseToolCalls(t *testing.T) {
 
 	t.Run("unknown tool error", func(t *testing.T) {
 		text := "<tool_call>\n<function=unknown_fn>\n<parameter=x>\n1\n</parameter>\n</function>\n</tool_call>"
-		_, _, err := qwen.ParseToolCallsForTest(text, tools)
+		_, _, err := parseToolCalls(text, tools)
 		if err == nil {
 			t.Fatal("expected error for unknown tool call, got nil")
 		}
@@ -89,7 +88,7 @@ func TestParseToolCalls(t *testing.T) {
 
 	t.Run("malformed xml error", func(t *testing.T) {
 		text := "<tool_call>\n<function=clinic_hours>\n<parameter=day>\nlunes\n</parameter>"
-		_, _, err := qwen.ParseToolCallsForTest(text, tools)
+		_, _, err := parseToolCalls(text, tools)
 		if err == nil {
 			t.Fatal("expected error for unclosed tool call, got nil")
 		}

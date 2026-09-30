@@ -1,4 +1,4 @@
-package tests
+package qwen
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"webtyp.com/llm"
-	"webtyp.com/qwen"
 )
 
 type TestCase struct {
@@ -44,7 +43,7 @@ type RawFunctionDef struct {
 }
 
 func TestRenderFixtures(t *testing.T) {
-	data, err := os.ReadFile("../testdata/chat_template_cases.json")
+	data, err := os.ReadFile("testdata/chat_template_cases.json")
 	if err != nil {
 		t.Fatalf("failed to read test fixture: %v", err)
 	}
@@ -57,7 +56,7 @@ func TestRenderFixtures(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			req := convertToLLMRequest(tc)
-			segs, err := qwen.RenderForTest(req)
+			segs, err := render(req)
 			if err != nil {
 				t.Fatalf("render failed: %v", err)
 			}
