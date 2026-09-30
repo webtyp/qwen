@@ -157,3 +157,58 @@ func TestNewModel_DecodesByteLevelTokens(t *testing.T) {
 		}
 	}
 }
+
+// The answer is each generated piece once: "Hola", not "HHoollaa". GenerateStream hands over
+// the same pieces, and they concatenate to the same Text.
+func TestGenerate_TextIsEachPieceOnce(t *testing.T) {
+	cfg := Config{Merges: []byte("H o\nHo l\nHol a"), Decoder: Qwen35_08B}
+	newScripted := func() *Model {
+		m, err := newModel(cfg, []string{"H", "o", "l", "a", "<|im_end|>"}, &scriptedStepper{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	req := llm.Request{Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hola"}}, MaxOutputTokens: 10}
+
+	m := newScripted()
+	m.stepper = &scriptedStepper{tokensToEmit: holaAfterPrompt(t, m, req)}
+	resp, err := m.Generate(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "Hola" {
+		t.Errorf("Generate: Text = %q, want %q", resp.Text, "Hola")
+	}
+
+	m = newScripted()
+	m.stepper = &scriptedStepper{tokensToEmit: holaAfterPrompt(t, m, req)}
+	var pieces string
+	resp, err = m.GenerateStream(context.Background(), req, func(s string) { pieces += s })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "Hola" || pieces != "Hola" {
+		t.Errorf("GenerateStream: Text = %q, pieces = %q, want both %q", resp.Text, pieces, "Hola")
+	}
+}
+
+// holaAfterPrompt scripts the stepper: whatever it emits while the prompt is fed is ignored,
+// then it writes H, o, l, a and <|im_end|>.
+func holaAfterPrompt(t *testing.T, m *Model, req llm.Request) []int {
+	t.Helper()
+	segs, err := render(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, s := range segs {
+		if s.IsSpecial {
+			n++
+		} else {
+			n += len(m.bpe.EncodeOrdinary(nil, s.Text))
+		}
+	}
+	script := make([]int, n-1) // the last prompt token's step produces the first answer token
+	return append(script, 0, 1, 2, 3, 248046)
+}

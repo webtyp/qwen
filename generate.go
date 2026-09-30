@@ -22,39 +22,7 @@ func (m *Model) CountTokens(text string) int {
 
 // Generate generates a complete response for a prompt request.
 func (m *Model) Generate(ctx *context.Context, req llm.Request) (llm.Response, error) {
-	var fullText string
-	var toolCalls []llm.ToolCall
-	var stopReason llm.StopReason
-	var promptTokens int
-	var genTokens int
-
-	err := m.generateStreamInternal(ctx, req, func(chunk string) {
-		fullText += chunk
-	}, &fullText, &toolCalls, &stopReason, &promptTokens, &genTokens)
-
-	if err != nil {
-		return llm.Response{}, err
-	}
-
-	text := fullText
-	if len(req.Tools) > 0 {
-		parsedText, parsedCalls, parseErr := parseToolCalls(fullText, req.Tools)
-		if parseErr == nil && len(parsedCalls) > 0 {
-			text = parsedText
-			toolCalls = parsedCalls
-			stopReason = llm.StopToolUse
-		}
-	}
-
-	return llm.Response{
-		Text:       text,
-		StopReason: stopReason,
-		ToolCalls:  toolCalls,
-		Usage: llm.Usage{
-			InputTokens:  promptTokens,
-			OutputTokens: genTokens,
-		},
-	}, nil
+	return m.GenerateStream(ctx, req, nil)
 }
 
 // GenerateStream streams generated text tokens as they are produced.
