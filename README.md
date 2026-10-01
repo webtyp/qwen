@@ -24,11 +24,15 @@ and an `llm.Decider` (`Decide`).
 While it generates, a grammar lets the model write only an answer or well-formed tool calls
 whose parameters follow each tool's schema. Special tokens typed by a person stay text.
 
-**STATUS (remove this note when decoder v0.2.0 is published):** `webtyp/decoder` v0.1.0 reads
-float32 weights only, so `New` rejects the int8 artifact until decoder v0.2.0 reads
-`Int8Block32`.
-
 ## Closed questions (`llm.Decider`)
+
+**Keeping the tool list across sessions.** A question that is not yes/no is read question first,
+so the tool list is a fixed prefix that the model reads once and caches. Reading it is the slowest
+part of the first decision (22–44 s in the browser). `data, ok, err := model.SaveDecisionCache()`
+returns that cache as bytes (≈ 19 MB for decider-0.8b) for the Worker to keep in OPFS;
+`model.LoadDecisionCache(data)` restores it on the next start, and refuses bytes saved with other
+weights.
+
 
 `decider-0.8b` (a Qwen3.5-0.8B fine-tune) answers closed questions by reading, in **one pass
 over the prompt**, the probability of each option's letter as the next token.

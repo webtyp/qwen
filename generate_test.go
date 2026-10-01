@@ -1,6 +1,7 @@
 package qwen
 
 import (
+	"encoding/json"
 	"testing"
 	"webtyp.com/decoder"
 
@@ -230,4 +231,20 @@ func holaAfterPrompt(t *testing.T, m *Model, req llm.Request) []int {
 	}
 	script := make([]int, n-1) // the last prompt token's step produces the first answer token
 	return append(script, 0, 1, 2, 3, 248046)
+}
+
+// saveFakeState and loadFakeState are the test steppers' SaveState and LoadState.
+func saveFakeState(state any) ([]byte, error) { return json.Marshal(state.(*fakeState).ids) }
+
+func loadFakeState(state any, data []byte) error {
+	return json.Unmarshal(data, &state.(*fakeState).ids)
+}
+
+func (s *scriptedStepper) SaveState(state any) ([]byte, error) { return saveFakeState(state) }
+func (s *scriptedStepper) LoadState(state any, data []byte) error {
+	return loadFakeState(state, data)
+}
+func (s *letterStepper) SaveState(state any) ([]byte, error) { return saveFakeState(state) }
+func (s *letterStepper) LoadState(state any, data []byte) error {
+	return loadFakeState(state, data)
 }

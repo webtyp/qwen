@@ -60,6 +60,9 @@ type stepper interface {
 	// LogitsFor writes the logits of tokens ids for the position last stepped (Step with nil
 	// logits reads a token without computing the whole vocabulary).
 	LogitsFor(state any, ids []int, out []float32) error
+	// SaveState and LoadState turn a state into bytes and back (SaveDecisionCache).
+	SaveState(state any) ([]byte, error)
+	LoadState(state any, data []byte) error
 }
 
 // realStepper implements stepper wrapping decoder.Model and decoder.State.
@@ -77,6 +80,14 @@ func (s *realStepper) LogitsFor(state any, ids []int, out []float32) error {
 
 func (s *realStepper) CopyState(dst, src any) error {
 	return dst.(*decoder.State).CopyFrom(src.(*decoder.State))
+}
+
+func (s *realStepper) SaveState(state any) ([]byte, error) {
+	return state.(*decoder.State).MarshalBinary()
+}
+
+func (s *realStepper) LoadState(state any, data []byte) error {
+	return state.(*decoder.State).UnmarshalBinary(data)
 }
 
 func (s *realStepper) Step(state any, token int, logits []float32) error {
