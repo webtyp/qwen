@@ -13,8 +13,9 @@ type snapshot struct {
 // assistant turns, so a request rarely starts with the whole previous prompt, but it always
 // starts with everything up to the previous request's last message.
 type prefixCache struct {
-	system snapshot
-	last   snapshot
+	system   snapshot
+	last     snapshot
+	decision snapshot
 }
 
 // reset forgets both snapshots (a new stepper means a different model state).
