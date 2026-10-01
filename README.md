@@ -19,13 +19,44 @@ model, err := qwen.New(qwen.Config{
 answer, err := model.Generate(ctx, llm.Request{System: "…", Messages: msgs, Tools: tools, MaxOutputTokens: 512})
 ```
 
-`model` is also an `llm.TokenCounter` (`CountTokens`) and an `llm.Streamer` (`GenerateStream`).
+`model` is also an `llm.TokenCounter` (`CountTokens`), an `llm.Streamer` (`GenerateStream`),
+and an `llm.Decider` (`Decide`).
 While it generates, a grammar lets the model write only an answer or well-formed tool calls
 whose parameters follow each tool's schema. Special tokens typed by a person stay text.
 
 **STATUS (remove this note when decoder v0.2.0 is published):** `webtyp/decoder` v0.1.0 reads
 float32 weights only, so `New` rejects the int8 artifact until decoder v0.2.0 reads
 `Int8Block32`.
+
+## Closed questions (`llm.Decider`)
+
+`decider-0.8b` (a Qwen3.5-0.8B fine-tune) answers closed questions by reading, in **one pass
+over the prompt**, the probability of each option's letter as the next token.
+
+`decider-0.8b` was trained on two prompt layouts:
+
+| Layout | Route among 9 tools | Injection yes/no | Yes/no from data |
+|---|---|---|---|
+| **state-first** | 14/18 | **10/10** | **8/8** |
+| **schema-first** | **18/18** | 6/10 | 6/8 |
+
+**The rule:** options exactly `["no", "yes"]` → state-first; any other options → schema-first.
+Schema-first places the question and options **before** the context, so a static schema or tool
+list is evaluated once and cached across decisions.
+
+```go
+model, err := qwen.New(qwen.Config{
+    Weights:           art,
+    Merges:            mergesBytes,
+    Decoder:           qwen.Qwen35_08B,
+    DecideTemperature: 1.03, // decider-0.8b decision temperature
+})
+decision, err := model.Decide(ctx, llm.Question{
+    Context: "User input or data...",
+    Text:    "Which tool fits?",
+    Options: []string{"search", "calculator", "none"},
+})
+```
 
 ## Reading only what is new
 

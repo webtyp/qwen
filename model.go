@@ -11,9 +11,10 @@ import (
 
 // Config configures a Qwen model instance.
 type Config struct {
-	Weights *weights.Artifact // from webtyp/weightsc -quant int8-block32 -prefix model.language_model.; its Tokenizer.Vocab is the vocabulary
-	Merges  []byte            // the companion .merges file (one "left right" pair per line, rank order)
-	Decoder decoder.Config    // the checkpoint's shape; Qwen35_08B for the 0.8B model
+	Weights           *weights.Artifact // from webtyp/weightsc -quant int8-block32 -prefix model.language_model.; its Tokenizer.Vocab is the vocabulary
+	Merges            []byte            // the companion .merges file (one "left right" pair per line, rank order)
+	Decoder           decoder.Config    // the checkpoint's shape; Qwen35_08B for the 0.8B model
+	DecideTemperature float64           // the decision temperature (decider-0.8b: 1.03); 0 means 1
 }
 
 // Qwen35_08B is the shape of Qwen3.5-0.8B, from the text_config of its config.json:
@@ -85,6 +86,7 @@ type Model struct {
 	mu        sync.Mutex  // one Generate at a time: they share the cache
 	cache     prefixCache // what was read last (cache.go)
 	newlineID int32       // the token id of "\n", for finding where messages end
+	letterIDs []int32     // token ids for letters A through J
 }
 
 // setStepper replaces the stepper and forgets the cache, whose states belong to the old one.
@@ -145,7 +147,17 @@ func newModel(cfg Config, vocab []string, s stepper) (*Model, error) {
 	if nl := bpe.EncodeOrdinary(nil, "\n"); len(nl) == 1 {
 		newlineID = nl[0]
 	}
-	return &Model{cfg: cfg, stepper: s, tok: &qwenTokenizer{vocab: decoded}, bpe: bpe, newlineID: newlineID}, nil
+	letterIDs := make([]int32, 10)
+	for i := 0; i < 10; i++ {
+		letter := string(rune('A' + i))
+		enc := bpe.EncodeOrdinary(nil, letter)
+		if len(enc) == 1 {
+			letterIDs[i] = enc[0]
+		} else {
+			letterIDs[i] = -1
+		}
+	}
+	return &Model{cfg: cfg, stepper: s, tok: &qwenTokenizer{vocab: decoded}, bpe: bpe, newlineID: newlineID, letterIDs: letterIDs}, nil
 }
 
 func splitLines(s string) []string {
