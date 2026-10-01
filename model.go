@@ -1,6 +1,8 @@
 package qwen
 
 import (
+	"sync"
+
 	"webtyp.com/decoder"
 	"webtyp.com/fmt"
 	"webtyp.com/tokenizer"
@@ -51,6 +53,8 @@ func qwen35Layers(n, interval int) []decoder.LayerKind {
 type stepper interface {
 	NewState() any
 	Step(state any, token int, logits []float32) error
+	// CopyState makes dst the same sequence state as src.
+	CopyState(dst, src any) error
 }
 
 // realStepper implements stepper wrapping decoder.Model and decoder.State.
@@ -60,6 +64,10 @@ type realStepper struct {
 
 func (s *realStepper) NewState() any {
 	return s.model.NewState()
+}
+
+func (s *realStepper) CopyState(dst, src any) error {
+	return dst.(*decoder.State).CopyFrom(src.(*decoder.State))
 }
 
 func (s *realStepper) Step(state any, token int, logits []float32) error {
@@ -73,6 +81,16 @@ type Model struct {
 	stepper stepper
 	tok     *qwenTokenizer
 	bpe     *tokenizer.BPE
+
+	mu        sync.Mutex  // one Generate at a time: they share the cache
+	cache     prefixCache // what was read last (cache.go)
+	newlineID int32       // the token id of "\n", for finding where messages end
+}
+
+// setStepper replaces the stepper and forgets the cache, whose states belong to the old one.
+func (m *Model) setStepper(s stepper) {
+	m.stepper = s
+	m.cache.reset()
 }
 
 type qwenTokenizer struct {
@@ -121,7 +139,13 @@ func newModel(cfg Config, vocab []string, s stepper) (*Model, error) {
 	for i, v := range vocab {
 		decoded[i] = tokenizer.QwenScheme{}.DecodeToken(nil, v)
 	}
-	return &Model{cfg: cfg, stepper: s, tok: &qwenTokenizer{vocab: decoded}, bpe: bpe}, nil
+	// Qwen's vocabulary has one token for "\n" (Ċ); without it, message ends cannot be found and
+	// the prefix cache stays empty (every request is read in full, which is only slower).
+	newlineID := int32(-1)
+	if nl := bpe.EncodeOrdinary(nil, "\n"); len(nl) == 1 {
+		newlineID = nl[0]
+	}
+	return &Model{cfg: cfg, stepper: s, tok: &qwenTokenizer{vocab: decoded}, bpe: bpe, newlineID: newlineID}, nil
 }
 
 func splitLines(s string) []string {

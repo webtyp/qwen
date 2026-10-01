@@ -27,6 +27,14 @@ whose parameters follow each tool's schema. Special tokens typed by a person sta
 float32 weights only, so `New` rejects the int8 artifact until decoder v0.2.0 reads
 `Int8Block32`.
 
+## Reading only what is new
+
+A model reads its whole prompt before answering, and that costs as much per token as writing.
+`qwen` keeps the decoder state after the system block and after the last complete message, so
+the next request of a conversation reads only what came after them (measured: 71.5 s for the
+first turn, 21.8 s for the second). It is automatic; it helps most when the system prompt and
+tools stay the same during a conversation, which `webtyp/agentcontext` guarantees.
+
 ## Artifact Building
 
 Build the weights artifact and the merges file once, on the developer machine, with

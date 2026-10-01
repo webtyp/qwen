@@ -27,6 +27,8 @@ func (m *Model) Generate(ctx *context.Context, req llm.Request) (llm.Response, e
 
 // GenerateStream streams generated text tokens as they are produced.
 func (m *Model) GenerateStream(ctx *context.Context, req llm.Request, onText func(string)) (llm.Response, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	var fullText string
 	var toolCalls []llm.ToolCall
 	var stopReason llm.StopReason
@@ -89,16 +91,11 @@ func (m *Model) generateStreamInternal(
 	}
 
 	*promptTokenCount = len(promptIds)
-
-	st := m.stepper.NewState()
-
 	logits := make([]float32, m.logitsSize())
 
-	// Feed prompt
-	for _, id := range promptIds {
-		if err := m.stepper.Step(st, int(id), logits); err != nil {
-			return err
-		}
+	st, err := m.readPrompt(promptIds, logits)
+	if err != nil {
+		return err
 	}
 
 	maxGen := req.MaxOutputTokens
@@ -201,4 +198,53 @@ func (m *Model) decodeToken(id int) string {
 
 func gInToolCallMarkup(st grammarState) bool {
 	return st.mode != gModeFreeText
+}
+
+// readPrompt feeds prompt to a decoder state, starting from the longest cached prefix, and
+// refreshes the cache's snapshots on the way. logits holds the prediction after the last id.
+func (m *Model) readPrompt(prompt []int32, logits []float32) (any, error) {
+	st := m.stepper.NewState()
+	start := 0
+	if snap := m.cache.resumeFrom(prompt); snap != nil {
+		if err := m.stepper.CopyState(st, snap.state); err != nil {
+			return nil, err
+		}
+		start = len(snap.ids)
+	}
+
+	ends := messageEnds(prompt, m.newlineID)
+	systemEnd, lastEnd := -1, -1
+	if len(ends) > 0 {
+		lastEnd = ends[len(ends)-1]
+		if len(prompt) > 0 && prompt[0] == int32(lookupSpecialTokenID(tokenImStart)) {
+			systemEnd = ends[0]
+		}
+	}
+
+	for i := start; i < len(prompt); i++ {
+		if err := m.stepper.Step(st, int(prompt[i]), logits); err != nil {
+			return nil, err
+		}
+		pos := i + 1
+		if pos == systemEnd {
+			if err := m.save(&m.cache.system, prompt[:pos], st); err != nil {
+				return nil, err
+			}
+		}
+		if pos == lastEnd && lastEnd != systemEnd {
+			if err := m.save(&m.cache.last, prompt[:pos], st); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return st, nil
+}
+
+// save copies st into snap, reusing snap's state once it exists.
+func (m *Model) save(snap *snapshot, ids []int32, st any) error {
+	if snap.state == nil {
+		snap.state = m.stepper.NewState()
+	}
+	snap.ids = append(snap.ids[:0], ids...)
+	return m.stepper.CopyState(snap.state, st)
 }

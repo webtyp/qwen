@@ -11,13 +11,24 @@ import (
 type scriptedStepper struct {
 	tokensToEmit []int
 	stepIdx      int
+	fed          int // tokens fed through Step, prompt and generation
 }
 
-func (s *scriptedStepper) NewState() any {
-	return s
+// fakeState records the ids fed to it; copying it copies them.
+type fakeState struct{ ids []int }
+
+func (s *scriptedStepper) NewState() any { return &fakeState{} }
+
+func (s *scriptedStepper) CopyState(dst, src any) error {
+	d, o := dst.(*fakeState), src.(*fakeState)
+	d.ids = append(d.ids[:0], o.ids...)
+	return nil
 }
 
 func (s *scriptedStepper) Step(state any, token int, logits []float32) error {
+	st := state.(*fakeState)
+	st.ids = append(st.ids, token)
+	s.fed++
 	for i := range logits {
 		logits[i] = -100
 	}
@@ -58,9 +69,9 @@ func TestGenerateWithFakeStepper(t *testing.T) {
 		script[103] = 3 // a
 		script[104] = 248046
 
-		m.stepper = &scriptedStepper{
+		m.setStepper(&scriptedStepper{
 			tokensToEmit: script,
-		}
+		})
 
 		req := llm.Request{
 			Messages: []llm.Message{
@@ -93,9 +104,9 @@ func TestGenerateWithFakeStepper(t *testing.T) {
 		script[103] = 3 // a
 		script[104] = 248046
 
-		m.stepper = &scriptedStepper{
+		m.setStepper(&scriptedStepper{
 			tokensToEmit: script,
-		}
+		})
 
 		req := llm.Request{
 			Messages: []llm.Message{
@@ -172,7 +183,7 @@ func TestGenerate_TextIsEachPieceOnce(t *testing.T) {
 	req := llm.Request{Messages: []llm.Message{{Role: llm.RoleUser, Content: "Hola"}}, MaxOutputTokens: 10}
 
 	m := newScripted()
-	m.stepper = &scriptedStepper{tokensToEmit: holaAfterPrompt(t, m, req)}
+	m.setStepper(&scriptedStepper{tokensToEmit: holaAfterPrompt(t, m, req)})
 	resp, err := m.Generate(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +193,7 @@ func TestGenerate_TextIsEachPieceOnce(t *testing.T) {
 	}
 
 	m = newScripted()
-	m.stepper = &scriptedStepper{tokensToEmit: holaAfterPrompt(t, m, req)}
+	m.setStepper(&scriptedStepper{tokensToEmit: holaAfterPrompt(t, m, req)})
 	var pieces string
 	resp, err = m.GenerateStream(context.Background(), req, func(s string) { pieces += s })
 	if err != nil {

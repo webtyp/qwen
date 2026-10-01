@@ -1,11 +1,10 @@
----
-PLAN: "feat: reuse the state of the prompt's fixed prefix — each turn reads only what is new"
-TAG: v0.2.0
-EXECUTOR: jules
-REVIEWER: none
-STATUS: running
-SESSION: 12849310964587612452
----
+> **Executed locally on 2026-09-30** (the dispatched session opened an empty PR, #2, closed).
+> The design changed while implementing it: Qwen's chat template drops the `<think>` block of
+> earlier assistant turns, so a request rarely starts with the whole previous prompt. The cache
+> keeps two snapshots instead: after the system block, and after the last complete message
+> (`cache.go`). Measured with the real Qwen3.5-0.8B: turn 1 (126 prompt tokens) 71.5 s, turn 2
+> (151 prompt tokens) 21.8 s.
+
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
 
