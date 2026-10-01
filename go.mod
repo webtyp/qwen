@@ -7,7 +7,7 @@ require (
 	webtyp.com/decoder v0.5.1
 	webtyp.com/fmt v1.0.0
 	webtyp.com/llm v0.2.0
-	webtyp.com/tokenizer v0.4.1
+	webtyp.com/tokenizer v0.4.2
 	webtyp.com/weights v0.2.0
 )
 

@@ -6,6 +6,7 @@ import (
 	"webtyp.com/context"
 	"webtyp.com/fmt"
 	"webtyp.com/llm"
+	"webtyp.com/tokenizer"
 )
 
 // Ensure Model implements llm.Client, llm.Streamer, llm.TokenCounter
@@ -108,6 +109,7 @@ func (m *Model) generateStreamInternal(
 
 	*genTokenCount = 0
 	imEndID := lookupSpecialTokenID(tokenImEnd)
+	var shown tokenizer.Stream
 
 	for *genTokenCount < maxGen {
 		g.maskLogits(logits, gState)
@@ -124,13 +126,18 @@ func (m *Model) generateStreamInternal(
 		*fullText += tokStr
 		gState = g.nextState(gState, tokStr)
 
-		if onText != nil && !gInToolCallMarkup(gState) {
-			onText(tokStr)
+		// A token can end in half a UTF-8 character: the stream shows whole characters only.
+		if chunk := shown.Write([]byte(tokStr)); chunk != "" && onText != nil && !gInToolCallMarkup(gState) {
+			onText(chunk)
 		}
 
 		if err := m.stepper.Step(st, nextID, logits); err != nil {
 			return err
 		}
+	}
+
+	if tail := shown.Flush(); tail != "" && onText != nil && !gInToolCallMarkup(gState) {
+		onText(tail)
 	}
 
 	if *genTokenCount >= maxGen && *stopReason == "" {
