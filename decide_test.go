@@ -52,6 +52,16 @@ func (s *letterStepper) CopyState(dst, src any) error {
 	return nil
 }
 
+func (s *letterStepper) LogitsFor(state any, ids []int, out []float32) error {
+	for k, id := range ids {
+		out[k] = -100
+		if i := id - 65; i >= 0 && i < len(s.want) {
+			out[k] = s.want[i]
+		}
+	}
+	return nil
+}
+
 func (s *letterStepper) Step(state any, token int, logits []float32) error {
 	st := state.(*fakeState)
 	st.ids = append(st.ids, token)

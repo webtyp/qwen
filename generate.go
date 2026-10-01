@@ -222,7 +222,12 @@ func (m *Model) readPrompt(prompt []int32, logits []float32) (any, error) {
 	}
 
 	for i := start; i < len(prompt); i++ {
-		if err := m.stepper.Step(st, int(prompt[i]), logits); err != nil {
+		// Only the last prompt token's prediction is used: the others skip the output projection.
+		var out []float32
+		if i == len(prompt)-1 {
+			out = logits
+		}
+		if err := m.stepper.Step(st, int(prompt[i]), out); err != nil {
 			return nil, err
 		}
 		pos := i + 1

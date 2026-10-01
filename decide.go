@@ -29,8 +29,12 @@ func (m *Model) Decide(ctx *context.Context, q llm.Question) (llm.Decision, erro
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	logits := make([]float32, m.logitsSize())
-	if err := m.readDecidePrompt(ids, prefixLen, logits); err != nil {
+	letters := make([]int, nOpts)
+	for i := range letters {
+		letters[i] = int(m.letterIDs[i])
+	}
+	letterLogits := make([]float32, nOpts)
+	if err := m.readDecidePrompt(ids, prefixLen, letters, letterLogits); err != nil {
 		return llm.Decision{}, err
 	}
 
@@ -42,8 +46,7 @@ func (m *Model) Decide(ctx *context.Context, q llm.Question) (llm.Decision, erro
 	z := make([]float64, nOpts)
 	maxZ := math.Inf(-1)
 	for i := 0; i < nOpts; i++ {
-		letterID := m.letterIDs[i]
-		val := float64(logits[letterID]) / temp
+		val := float64(letterLogits[i]) / temp
 		z[i] = val
 		if val > maxZ {
 			maxZ = val
@@ -123,7 +126,7 @@ func (m *Model) decideIDs(q llm.Question) (ids []int32, prefixLen int) {
 	return ids, prefixLen
 }
 
-func (m *Model) readDecidePrompt(ids []int32, prefixLen int, logits []float32) error {
+func (m *Model) readDecidePrompt(ids []int32, prefixLen int, letters []int, out []float32) error {
 	st := m.stepper.NewState()
 	start := 0
 
@@ -138,7 +141,8 @@ func (m *Model) readDecidePrompt(ids []int32, prefixLen int, logits []float32) e
 	}
 
 	for i := start; i < len(ids); i++ {
-		if err := m.stepper.Step(st, int(ids[i]), logits); err != nil {
+		// No prompt token needs the whole vocabulary's logits; only the letters, at the end.
+		if err := m.stepper.Step(st, int(ids[i]), nil); err != nil {
 			return err
 		}
 		pos := i + 1
@@ -148,5 +152,5 @@ func (m *Model) readDecidePrompt(ids []int32, prefixLen int, logits []float32) e
 			}
 		}
 	}
-	return nil
+	return m.stepper.LogitsFor(st, letters, out)
 }

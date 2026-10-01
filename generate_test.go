@@ -25,6 +25,14 @@ func (s *scriptedStepper) CopyState(dst, src any) error {
 	return nil
 }
 
+// LogitsFor is not used by generation; decisions use letterStepper.
+func (s *scriptedStepper) LogitsFor(state any, ids []int, out []float32) error {
+	for k := range ids {
+		out[k] = -100
+	}
+	return nil
+}
+
 func (s *scriptedStepper) Step(state any, token int, logits []float32) error {
 	st := state.(*fakeState)
 	st.ids = append(st.ids, token)

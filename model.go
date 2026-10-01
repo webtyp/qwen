@@ -57,6 +57,9 @@ type stepper interface {
 	Step(state any, token int, logits []float32) error
 	// CopyState makes dst the same sequence state as src.
 	CopyState(dst, src any) error
+	// LogitsFor writes the logits of tokens ids for the position last stepped (Step with nil
+	// logits reads a token without computing the whole vocabulary).
+	LogitsFor(state any, ids []int, out []float32) error
 }
 
 // realStepper implements stepper wrapping decoder.Model and decoder.State.
@@ -66,6 +69,10 @@ type realStepper struct {
 
 func (s *realStepper) NewState() any {
 	return s.model.NewState()
+}
+
+func (s *realStepper) LogitsFor(state any, ids []int, out []float32) error {
+	return s.model.LogitsFor(state.(*decoder.State), ids, out)
 }
 
 func (s *realStepper) CopyState(dst, src any) error {
