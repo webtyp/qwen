@@ -22,6 +22,7 @@ type Config struct {
 // grouped-query attention 8/2 with 256-wide heads, RoPE on the first 64 dims
 // (partial_rotary_factor 0.25) with theta 1e7.
 var Qwen35_08B = decoder.Config{
+	Arch:             decoder.Qwen35,
 	Vocab:            248320,
 	Hidden:           1024,
 	Intermediate:     3584,
