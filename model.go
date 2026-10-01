@@ -138,7 +138,7 @@ func newModel(cfg Config, vocab []string, s stepper) (*Model, error) {
 	bpe, err := tokenizer.New(tokenizer.Config{
 		Scheme: tokenizer.QwenScheme{},
 		Vocab:  vocab,
-		Merges: splitLines(string(cfg.Merges)),
+		Merges: tokenizer.ParseMerges(cfg.Merges),
 	})
 	if err != nil {
 		return nil, err
@@ -166,27 +166,4 @@ func newModel(cfg Config, vocab []string, s stepper) (*Model, error) {
 		}
 	}
 	return &Model{cfg: cfg, stepper: s, tok: &qwenTokenizer{vocab: decoded}, bpe: bpe, newlineID: newlineID, letterIDs: letterIDs}, nil
-}
-
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			line := s[start:i]
-			if len(line) > 0 && line[len(line)-1] == '\r' {
-				line = line[:len(line)-1]
-			}
-			lines = append(lines, line)
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		line := s[start:]
-		if len(line) > 0 && line[len(line)-1] == '\r' {
-			line = line[:len(line)-1]
-		}
-		lines = append(lines, line)
-	}
-	return lines
 }
