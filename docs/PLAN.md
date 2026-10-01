@@ -3,6 +3,8 @@ PLAN: "feat: Model implements llm.Decider — decider-0.8b answers closed questi
 TAG: v0.3.0
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 419060418803735474
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
