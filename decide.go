@@ -82,47 +82,45 @@ func isYesNo(options []string) bool {
 	return len(options) == 2 && options[0] == "no" && options[1] == "yes"
 }
 
-func (m *Model) decideIDs(q llm.Question) (ids []int32, prefixLen int) {
-	if isYesNo(q.Options) {
-		p1 := "Context:\n" + q.Context
-		p2 := "\n\nQuestion: " + q.Text + "\nOptions:"
-		for i, opt := range q.Options {
-			letter := string(rune('A' + i))
-			p2 += "\n(" + letter + ") " + opt
-		}
-		p2 += "\nAnswer: ("
+// DecidePrompt returns the text the model reads for q, in pieces. Each piece is tokenized on its
+// own and the ids are joined in order, so no token spans two pieces. A yes/no question puts the
+// context first; any other puts the question and options first, the prefix kept between
+// decisions (D27). agenteval sends the same pieces to llama-server, so what it measures is the
+// prompt the browser reads.
+func DecidePrompt(q llm.Question) []string {
+	parts, _ := decideParts(q)
+	return parts
+}
 
-		ids1 := m.bpe.EncodeOrdinary(nil, p1)
-		ids2 := m.bpe.EncodeOrdinary(nil, p2)
-		ids = append(ids, ids1...)
-		ids = append(ids, ids2...)
-		return ids, 0
-	}
-
-	p1 := "Question: " + q.Text + "\nOptions:"
-	var p2 string
+// decideParts returns DecidePrompt's pieces and how many of them form the cached prefix.
+func decideParts(q llm.Question) (parts []string, prefixParts int) {
+	var options string
 	for i, opt := range q.Options {
-		letter := string(rune('A' + i))
-		p2 += "\n(" + letter + ") " + opt
+		options += "\n(" + string(rune('A'+i)) + ") " + opt
 	}
-	p3 := "\n\nContext:\n"
-	p4 := q.Context
-	p5 := "\n\nAnswer: ("
+	if isYesNo(q.Options) {
+		return []string{
+			"Context:\n" + q.Context,
+			"\n\nQuestion: " + q.Text + "\nOptions:" + options + "\nAnswer: (",
+		}, 0
+	}
+	return []string{
+		"Question: " + q.Text + "\nOptions:",
+		options,
+		"\n\nContext:\n",
+		q.Context,
+		"\n\nAnswer: (",
+	}, 2
+}
 
-	ids1 := m.bpe.EncodeOrdinary(nil, p1)
-	ids2 := m.bpe.EncodeOrdinary(nil, p2)
-	ids3 := m.bpe.EncodeOrdinary(nil, p3)
-	ids4 := m.bpe.EncodeOrdinary(nil, p4)
-	ids5 := m.bpe.EncodeOrdinary(nil, p5)
-
-	prefixLen = len(ids1) + len(ids2)
-
-	ids = append(ids, ids1...)
-	ids = append(ids, ids2...)
-	ids = append(ids, ids3...)
-	ids = append(ids, ids4...)
-	ids = append(ids, ids5...)
-
+func (m *Model) decideIDs(q llm.Question) (ids []int32, prefixLen int) {
+	parts, prefixParts := decideParts(q)
+	for i, p := range parts {
+		ids = m.bpe.EncodeOrdinary(ids, p)
+		if i == prefixParts-1 {
+			prefixLen = len(ids)
+		}
+	}
 	return ids, prefixLen
 }
 

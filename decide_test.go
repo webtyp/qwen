@@ -324,3 +324,22 @@ func toInt32s(ids []int) []int32 {
 	}
 	return out
 }
+
+// TestDecidePrompt_Pieces pins the measured wording: agenteval renders these same pieces against
+// llama-server, so a change here changes what every measurement means.
+func TestDecidePrompt_Pieces(t *testing.T) {
+	yesNo := DecidePrompt(llm.Question{Context: "ctx", Text: "Is it?", Options: []string{"no", "yes"}})
+	wantYesNo := []string{"Context:\nctx", "\n\nQuestion: Is it?\nOptions:\n(A) no\n(B) yes\nAnswer: ("}
+	choice := DecidePrompt(llm.Question{Context: "ctx", Text: "Which?", Options: []string{"a: x", "none: y"}})
+	wantChoice := []string{"Question: Which?\nOptions:", "\n(A) a: x\n(B) none: y", "\n\nContext:\n", "ctx", "\n\nAnswer: ("}
+	for _, c := range []struct{ got, want []string }{{yesNo, wantYesNo}, {choice, wantChoice}} {
+		if len(c.got) != len(c.want) {
+			t.Fatalf("got %q, want %q", c.got, c.want)
+		}
+		for i := range c.got {
+			if c.got[i] != c.want[i] {
+				t.Errorf("piece %d = %q, want %q", i, c.got[i], c.want[i])
+			}
+		}
+	}
+}
