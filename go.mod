@@ -12,6 +12,6 @@ require (
 )
 
 require (
-	webtyp.com/nn v0.4.1 // indirect
+	webtyp.com/nn v0.5.0 // indirect
 	webtyp.com/vector v0.1.1 // indirect
 )
