@@ -12,5 +12,5 @@ webtyp.com/tokenizer v0.4.2 h1:N0uy6SlVcV19+y+gwvDrpNq9BD5jLUAb5cnzdf3z1PA=
 webtyp.com/tokenizer v0.4.2/go.mod h1:fwNrKvAZ7iDSSHTVRAHKoGlSNFH+R1nLV1MnnjGQhSk=
 webtyp.com/vector v0.1.1 h1:f4PsIPz5lYrXEEhbbPUz4bfd2+i7ujVGfsZRpf/G7/4=
 webtyp.com/vector v0.1.1/go.mod h1:IrRH9GrQ5Ym6DquOtuu+15W3nekNhaR8oRcdj+oDExQ=
-webtyp.com/weights v0.3.0 h1:FoQpfpDI8hyaRJXMAohQZ/S7MWL7bBs38ZR/uWFkooc=
-webtyp.com/weights v0.3.0/go.mod h1:KclzOcxyL4JJA9+6IqKVR6QKTIJFQCRSvBbzXQKmlnY=
+webtyp.com/weights v0.4.0 h1:ey3R0O6MkJLrv3RBWTtk9Fksf37NL97qDe7e1XKYCj8=
+webtyp.com/weights v0.4.0/go.mod h1:KclzOcxyL4JJA9+6IqKVR6QKTIJFQCRSvBbzXQKmlnY=

@@ -8,7 +8,7 @@ require (
 	webtyp.com/fmt v1.0.0
 	webtyp.com/llm v0.2.0
 	webtyp.com/tokenizer v0.4.2
-	webtyp.com/weights v0.3.0
+	webtyp.com/weights v0.4.0
 )
 
 require (
